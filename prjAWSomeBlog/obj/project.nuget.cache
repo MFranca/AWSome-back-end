@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "pRbQZ/+M1P8kH1jRA/hI9SCQWRFk1iXCzELVp75/evgSbjXV8BANlRbKt5eXIMnFa1jvfUeM1xuIiFzyGJhFZQ==",
+  "dgSpecHash": "dKNY+bHK9iy8meY6GZkCxlBZr27DA5ZEZswU0mO08eh5yH+WjvvqmBI1bySun0snmKZ9QKI0pL1uJi0cqrRd1Q==",
   "success": true,
   "projectFilePath": "C:\\Users\\MaFranca\\Documents\\Git\\backend\\src\\prjAWSomeBlog\\prjAWSomeBlog.csproj",
   "expectedPackageFiles": [
@@ -27,7 +27,8 @@
     "C:\\Users\\MaFranca\\.nuget\\packages\\newtonsoft.json\\12.0.3\\newtonsoft.json.12.0.3.nupkg.sha512",
     "C:\\Users\\MaFranca\\.nuget\\packages\\system.io.pipelines\\4.7.2\\system.io.pipelines.4.7.2.nupkg.sha512",
     "C:\\Users\\MaFranca\\.nuget\\packages\\system.memory\\4.5.0\\system.memory.4.5.0.nupkg.sha512",
-    "C:\\Users\\MaFranca\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\4.5.0\\system.runtime.compilerservices.unsafe.4.5.0.nupkg.sha512"
+    "C:\\Users\\MaFranca\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\4.5.0\\system.runtime.compilerservices.unsafe.4.5.0.nupkg.sha512",
+    "C:\\Users\\MaFranca\\.nuget\\packages\\microsoft.netcore.app.host.linux-x64\\3.1.13\\microsoft.netcore.app.host.linux-x64.3.1.13.nupkg.sha512"
   ],
   "logs": []
 }

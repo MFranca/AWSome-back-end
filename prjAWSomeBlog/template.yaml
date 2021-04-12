@@ -1,0 +1,376 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Stack 1 (Back-End) for AWSome Blog - M. Franca http://www.linkedin.com/in/mafranca
+# Ref.: https://github.com/aws-samples/sessions-with-aws-sam/blob/master/http-api/template.yaml
+# ---
+# CLI (examples)
+# sam validate
+# sam build
+# sam deploy -g
+# aws cloudformation delete-stack --stack-name fra-awsomeblog-back-stk --region us-east-2
+# sam logs -n MyAWSomeLambda --stack-name fra-awsomeblog-back-stk --tail
+
+#----------
+Parameters:
+  pTenantName:
+    Type: String
+    Description: Company (Tenant) name for this stack.
+  pProjectName:
+    Type: String
+    Description: Name of the CSharp project/microservice/lambda.
+  pCallbackURL:
+    Type: CommaDelimitedList
+    Description: Array of Callback URLs (domains) allowed to use the UserPool.
+    Default: http://localhost:4200/callback
+  pLogoutURL:
+    Type: CommaDelimitedList
+    Description: Array of Logout URLs (domains) allowed to use the UserPool.
+    Default: http://localhost:4200/home
+  pAdminEmail:
+    Type: String
+    Description: E-mail address for the admin user.
+  pTenantId:
+    Type: String
+    Description: Tenant ID of this stack infrastructure.
+
+#-------
+Globals:
+  Function:
+    Timeout: 60
+    Handler: !Sub '${pProjectName}::${pProjectName}.LambdaEntryPoint::FunctionHandlerAsync'    
+    Runtime: dotnetcore3.1
+    MemorySize: 512 #MB
+
+#---------
+Resources:
+#-------
+#COGNITO
+#-------
+  #For protecting our API, Cognito to the rescue!
+  #https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpool.html
+  AWSomeUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub ${pProjectName}-up 
+      AccountRecoverySetting:
+        RecoveryMechanisms: 
+          - Name: "verified_email"
+            Priority: 1
+      AdminCreateUserConfig: 
+        AllowAdminCreateUserOnly: true # only allow administrators to create users
+        UnusedAccountValidityDays: 90
+        InviteMessageTemplate:
+          EmailMessage: !Sub 'Your ${pProjectName} username is: {username}, and the temporary password is: {####}'
+          EmailSubject: !Sub '${pProjectName}: e-mail invite for ${pTenantName}'          
+      EmailVerificationSubject: !Sub '${pProjectName}: e-mail verification for ${pTenantName}'
+      Policies: 
+        PasswordPolicy: 
+          MinimumLength: 8          
+          RequireLowercase: false
+          RequireNumbers: false
+          RequireSymbols: false
+          RequireUppercase: false
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes: # Possible values: phone_number or email. 
+        - email
+      Schema: 
+        - AttributeDataType: String 
+          Name: email 
+          Required: true
+          Mutable: false
+        - AttributeDataType: String 
+          Name: tenantId
+          Required: false #Required custom attributes are not supported currently.
+          Mutable: false
+        - AttributeDataType: String
+          Name: companyName
+          Required: false
+          Mutable: true
+        - AttributeDataType: String 
+          Name: saasTier
+          Required: false
+          Mutable: true
+        - AttributeDataType: String 
+          Name: userRole
+          Required: false 
+          Mutable: true
+  
+  # Then, we create a new 'domain' for our user pool.
+  #https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpooldomain.html
+  AWSomeUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties: 
+      Domain: !Sub 'amazingblog-${AWS::AccountId}' # must be lower-case letters
+      UserPoolId: !Ref AWSomeUserPool
+
+  #Finally, we introduce our App Client to Cognito...
+  #https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpoolclient.html
+  AWSomeUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient 
+    Properties: 
+      ClientName: !Sub ${pProjectName}-AppClient
+      GenerateSecret: false # set to false for web clients // true for mobile (native) applications
+      UserPoolId: !Ref AWSomeUserPool 
+      ExplicitAuthFlows: 
+        - ALLOW_USER_SRP_AUTH #Enable SRP based authentication.
+        - ALLOW_REFRESH_TOKEN_AUTH #Enable authflow to refresh tokens. 
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs: !Ref pCallbackURL
+      LogoutURLs: !Ref pLogoutURL
+      AllowedOAuthFlowsUserPoolClient: true      
+      AllowedOAuthFlows:
+        - code #JWT
+        - implicit #for testing with postman, SHOULD BE AVOIDED IN PRODUCTION!!!      
+      AllowedOAuthScopes: #returned on the id token
+        - email
+        - openid
+        - profile  
+      ReadAttributes: 
+        - email
+        - name
+        - profile
+        #custom claims
+        - custom:tenantId 
+        - custom:userRole
+  
+  # for Amplify "import auth" command...
+  DoNotUseAppClient:
+    Type: AWS::Cognito::UserPoolClient 
+    Properties: 
+      ClientName: "DO-NOT-USE"
+      GenerateSecret: true # again, for Amplify "import auth" command...
+      UserPoolId: !Ref AWSomeUserPool 
+      ExplicitAuthFlows: 
+        - ALLOW_USER_SRP_AUTH #Enable SRP based authentication.
+        - ALLOW_REFRESH_TOKEN_AUTH #Enable authflow to refresh tokens. 
+      SupportedIdentityProviders:
+        - COGNITO
+      CallbackURLs: !Ref pCallbackURL
+      LogoutURLs: !Ref pLogoutURL
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code #JWT
+        - implicit #for testing with postman, SHOULD BE AVOIDED IN PRODUCTION!!!      
+      AllowedOAuthScopes: #returned on the id token
+        - email
+        - openid
+        - profile  
+      ReadAttributes: 
+        - email
+        - name
+        - profile
+        #custom claims
+        - custom:tenantId
+        - custom:userRole
+
+  # A user group...
+  AWSomeAdminUserGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties: 
+      GroupName: Admins
+      Description: !Sub "Admin user group for ${pProjectName}."
+      Precedence: 0 # in case the user is in multiple groups, the lower number takes precedence...
+      UserPoolId: !Ref AWSomeUserPool
+  
+  # The first (admin) user of the pool...
+  #https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-cognito-userpooluser.html
+  AWSomeAdminUser:
+    Type: AWS::Cognito::UserPoolUser
+    Properties:
+      Username: !Ref pAdminEmail #must be a e-mail
+      DesiredDeliveryMediums: 
+        - EMAIL
+      ForceAliasCreation: true
+      UserAttributes: 
+        - Name: email
+          Value: !Ref pAdminEmail
+        - Name: custom:tenantId
+          Value: !Ref pTenantId
+        - Name: custom:companyName
+          Value: !Ref pTenantName        
+        - Name: custom:userRole
+          Value: Admin
+      UserPoolId: !Ref AWSomeUserPool
+  
+  #Finaly, add new user to new group...
+  AddUserToGroup:
+    Type: AWS::Cognito::UserPoolUserToGroupAttachment
+    Properties: 
+      GroupName: !Ref AWSomeAdminUserGroup
+      Username: !Ref AWSomeAdminUser
+      UserPoolId: !Ref AWSomeUserPool
+
+#-----------
+#API Gateway
+#-----------     
+  #For exposing our APIs
+  #https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-httpapi.html
+  AWSomeHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Auth:
+        Authorizers:
+          AWSomeOAuth2Authorizer:
+            AuthorizationScopes:
+              - email
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${AWSomeUserPool}
+              audience:
+                - !Ref AWSomeUserPoolClient
+      CorsConfiguration: #https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-cors.html
+        AllowMethods:
+          - GET
+          - PUT
+          - OPTIONS #"'OPTIONS,GET,POST,PUT,DELETE'"
+        AllowHeaders: 
+          - Content-Type
+          - X-Amz-Date
+          - Authorization
+          - X-Api-Key
+        AllowOrigins:
+          - "*" #http://localhost:8080 or "'wwww.example.com'"
+
+#------
+#Lambda
+#------ 
+  #IAM Role
+  #https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-iam-role.html
+  AWSomeLambdaRole: 
+    Type: "AWS::IAM::Role"
+    Properties: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "lambda.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Description: "Lambda execution role created via SAM for AWSome Blog."
+      ManagedPolicyArns: 
+        - "arn:aws:iam::aws:policy/AWSLambda_FullAccess" # the old one was depracated (https://docs.aws.amazon.com/lambda/latest/dg/security_iam_troubleshoot.html#security_iam_troubleshoot-admin-deprecation)
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+        - "arn:aws:iam::aws:policy/AmazonSSMReadOnlyAccess"
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+      Path: "/"
+  
+  #Lambda itself
+  #https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html
+  MyAWSomeLambda:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: ''
+      Description: 'ASP.NET Core Web API Lambda as back-end for AWSome Blog.'
+      Environment:
+        Variables: # from AWSomeUserPoolDomain
+          userinfoEndpoint: !Sub 'https://amazingblog-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com/oauth2/userInfo'          
+      VersionDescription: 'v0.0.3'      
+      Role: !GetAtt AWSomeLambdaRole.Arn       
+      Events:
+        # ---------------------------------------- Public APIs --------------------------------
+        MyGetTestsVersionEvent: 
+          Type: HttpApi
+          Properties:
+            PayloadFormatVersion: '2.0'
+            Path: /api/tests/version
+            Method: GET
+            ApiId: !Ref AWSomeHttpApi
+        MyPutTestsAboutEvent: 
+          Type: HttpApi
+          Properties:
+            PayloadFormatVersion: '2.0'
+            Path: /api/tests/about
+            Method: PUT
+            ApiId: !Ref AWSomeHttpApi
+        MyGetTestsEvent: 
+          Type: HttpApi
+          Properties:
+            PayloadFormatVersion: '2.0'
+            Path: /api/tests
+            Method: GET
+            ApiId: !Ref AWSomeHttpApi
+        MyGetTestsIdEvent: 
+          Type: HttpApi
+          Properties:
+            PayloadFormatVersion: '2.0'
+            Path: /api/tests/{id}
+            Method: GET
+            ApiId: !Ref AWSomeHttpApi
+        # ---------------------------------------- Private APIs --------------------------------
+        MyPutTestsIdEvent: 
+          Type: HttpApi
+          Properties:
+            Auth:
+              Authorizer: AWSomeOAuth2Authorizer
+            PayloadFormatVersion: '2.0'
+            Path: /api/tests/{id}
+            Method: PUT
+            ApiId: !Ref AWSomeHttpApi        
+        MyPutVideosIdEvent: 
+          Type: HttpApi
+          Properties:
+            Auth:
+              Authorizer: AWSomeOAuth2Authorizer              
+            PayloadFormatVersion: '2.0'
+            Path: /api/videos/{id}
+            Method: PUT
+            ApiId: !Ref AWSomeHttpApi
+        MyGetVideoEvent:
+          Type: HttpApi
+          Properties:
+            Auth:
+              Authorizer: AWSomeOAuth2Authorizer              
+            PayloadFormatVersion: '2.0'
+            Path: /api/videos/{video}
+            Method: GET
+            ApiId: !Ref AWSomeHttpApi
+        MyGetLabelsEvent:
+          Type: HttpApi
+          Properties:
+            Auth:
+              Authorizer: AWSomeOAuth2Authorizer
+            PayloadFormatVersion: '2.0'
+            Path: /api/labels
+            Method: GET
+            ApiId: !Ref AWSomeHttpApi
+        MyGetLabelEvent:
+          Type: HttpApi
+          Properties:
+            Auth:
+              Authorizer: AWSomeOAuth2Authorizer
+            PayloadFormatVersion: '2.0'
+            Path: /api/labels/{label}
+            Method: GET
+            ApiId: !Ref AWSomeHttpApi        
+
+#---
+Outputs:
+  LambdaExecutionRole:
+    Description: "IAM Role ARN for executing the Lambda"
+    Value: !GetAtt AWSomeLambdaRole.Arn
+  ApiEndpoint:
+    Description: "HTTP API endpoint URL"
+    Value: !Sub "https://${AWSomeHttpApi}.execute-api.${AWS::Region}.amazonaws.com/api"
+  UserPoolDomain:
+    Description: "Cognito UP Domain used for userInfo URL" #see below
+    Value: !Ref AWSomeUserPoolDomain
+  UserPoolId:
+    Description: "User pool ID"
+    Value: !Ref AWSomeUserPool
+    Export:
+      Name: !Sub ${pProjectName}:UserPoolId
+  UserPoolClientId:
+    Description: "Application client ID (POSTMAN)"
+    Value: !Ref AWSomeUserPoolClient  
+  AuthUrl:
+    Description: "URL used for authentication/login (POSTMAN)..."
+    Value: !Sub https://${AWSomeUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/login
+  UserInfoUrl:
+    Description: "URL used for exchanging an access token for user information (POSTMAN)..."
+    Value: !Sub 'https://amazingblog-${AWS::AccountId}.auth.${AWS::Region}.amazoncognito.com/oauth2/userInfo'
