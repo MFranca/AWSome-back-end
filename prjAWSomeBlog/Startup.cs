@@ -19,6 +19,10 @@ namespace prjAWSomeBlog
         // This method gets called by the runtime. Use this method to add services to the container
         public void ConfigureServices(IServiceCollection services)
         {
+            // https://docs.microsoft.com/en-us/aspnet/core/fundamentals/http-requests?view=aspnetcore-3.1
+            // In order to query Cognito's endpoint later in TestsController...
+            services.AddHttpClient(); 
+
             // CORS Policy
             services.AddCors(options =>
             {                
