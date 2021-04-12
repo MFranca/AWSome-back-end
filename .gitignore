@@ -2,3 +2,4 @@
 prjAWSomeBlog/bin
 prjAWSomeBlog/.aws-sam/build
 prjAWSomeBlog/obj/Release
+prjAWSomeBlog/samconfig.toml

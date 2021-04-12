@@ -8,4 +8,4 @@ s3_prefix = "fra-awsomeblog-back-stk"
 region = "us-east-2"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
-parameter_overrides = "pTenantName=\"AWSomeTV\" pProjectName=\"prjAWSomeBlog\" pCallbackURL=\"http://localhost:4200/login,https://www.francas.team/login\" pLogoutURL=\"http://localhost:4200/home,https://www.francas.team/home\" pAdminEmail=\"mcfranca@amazon.com\" pTenantId=\"1\""
+parameter_overrides = "pTenantName=\"AWSomeTV\" pProjectName=\"prjAWSomeBlog\" pCallbackURL=\"http://localhost:4200/login,https://www.francas.team/login\" pLogoutURL=\"http://localhost:4200/home,https://www.francas.team/home\" pAdminEmail=\"your@email.here\" pTenantId=\"1\""
