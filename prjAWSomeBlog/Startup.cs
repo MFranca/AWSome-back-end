@@ -5,13 +5,17 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
+using prjS3Upload.Models;
+
 namespace prjAWSomeBlog
 {
     public class Startup
     {
+        private readonly IConfiguration _config;
+        
         public Startup(IConfiguration configuration)
         {
-            Configuration = configuration;
+            _config = configuration; 
         }
 
         public static IConfiguration Configuration { get; private set; }
@@ -36,6 +40,10 @@ namespace prjAWSomeBlog
             });
 
             services.AddControllers();
+
+            // Parameter Store
+            services.Configure<RekognitionOptions>(
+                _config.GetSection(RekognitionOptions.SectionName));         
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline

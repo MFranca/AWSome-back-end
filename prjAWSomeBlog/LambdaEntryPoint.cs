@@ -2,6 +2,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 
 using Microsoft.Extensions.Logging; // builder.ConfigureLogging()
+using Microsoft.Extensions.Configuration; // Parameter Store
+using Amazon; // RegionEndpoint
+using Amazon.Extensions.NETCore.Setup; // AWSOptions
 
 namespace prjAWSomeBlog
 {
@@ -19,7 +22,25 @@ namespace prjAWSomeBlog
         /// </summary>
         /// <param name="builder"></param>
         protected override void Init(IWebHostBuilder builder)
-        {            
+        {   
+            builder.ConfigureAppConfiguration((hostingContext, config) => 
+            {
+                var env = hostingContext.HostingEnvironment;
+
+                config.AddSystemsManager("/fra-awsomeblog", // Parameter store "prefix" - TODO: EXTERNAL PARAMETER
+                new AWSOptions
+                {
+                    Region = RegionEndpoint.USEast2 // TODO: EXTERNAL PARAMETER
+                });
+
+                config
+                    .SetBasePath(env.ContentRootPath)
+                    .AddJsonFile("appsettings.json", optional: true)
+                    .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true);
+
+                config.AddEnvironmentVariables();
+            });
+
             builder.ConfigureLogging((hostingContext, logging) =>
             {                
                 logging.ClearProviders();

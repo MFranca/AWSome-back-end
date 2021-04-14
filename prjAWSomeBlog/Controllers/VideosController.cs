@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.Extensions.Logging;
 
 using Amazon;
-//using Amazon.Lambda.Core;
 using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.AspNetCoreServer;
 
@@ -21,7 +20,7 @@ namespace prjS3Upload.Controllers
 {
     [Route("api/[controller]")]
     [Produces("application/Json")]
-    public class VideosController : ControllerBase // Controller instead of ControllerBase because we've decided to use 'return Json();'
+    public class VideosController : ControllerBase 
     {
         private readonly ILogger<VideosController> _logger;
         private readonly IHttpClientFactory _clientFactory;
@@ -58,8 +57,6 @@ namespace prjS3Upload.Controllers
 
             this._logger.LogInformation("Pre-Signed URL (put): " + response.URL);
 
-            //return Json(response); // requires extending from Controller
-
             return Ok
             (
               response
@@ -91,7 +88,7 @@ namespace prjS3Upload.Controllers
         private string GenerateUploadPreSignedUrl(String objectKey) 
         {
             string bucketName = this._rekognitionOptions.Value.UploadBucketName; // from Parameter Store
-            this._logger.LogInformation("*** GenerateUploadPreSignedUrl *** Bucket name for upload: '{0}'." + bucketName);
+            this._logger.LogInformation("*** GenerateUploadPreSignedUrl *** Bucket name for upload: '" + bucketName);
 
             LogUserInfo(); // for debugging purpose only
 
